@@ -29,7 +29,7 @@
 static void usage(void);
 static int open_file(const char* file);
 static void parse_source_code(int fd, const char* file);
-static void print_source_code(int fd, const char* file);
+static void print_source_code(int fd, FILE* outfile, const char* file);
 
 /****************************************************************/
 /****************************************************************/
@@ -39,7 +39,9 @@ static void print_source_code(int fd, const char* file);
 
 static void add_tag(int line, int offset, const char* string);
 static const char* find_tag(int line, int offset);
+#if defined(DEBUG) && (DEBUG > 0)
 static void dump_code_tags(void);
+#endif
 
 struct code_tag
 {
@@ -74,7 +76,9 @@ static void add_syntax_check(const char* syntax_check1,
                              const char* close_string_if_found);
 static void evaluate_syntax_checks(char* buffer, int buff_len, int line, int line_offset);
 static int active_rule(void);
+#if defined(DEBUG) && (DEBUG > 0)
 static void dump_syntax(void);
+#endif
 
 struct syntax_check
 {
@@ -106,8 +110,12 @@ static struct syntax_check *syntax_list = NULL;
 
 int main(int argc, char** argv)
 {
-   int opt, long_index, code_tag_debug = 0;
+   int opt, long_index;
+  #if defined(DEBUG) && (DEBUG > 0)
+   int code_tag_debug = 0;
+  #endif
    char* file = NULL;
+   FILE* outfile = NULL;
    struct option long_opts[] =
    {
       {
@@ -123,23 +131,34 @@ int main(int argc, char** argv)
          val     : 'f',
       },
       {
+         name    : "output",
+         has_arg : 1,
+         flag    : NULL,
+         val     : 'o',
+      },
+     #if defined(DEBUG) && (DEBUG > 0)
+      {
          name    : "dump-syntax",
          has_arg : 0,
          flag    : NULL,
          val     : 's',
       },
+     #endif
+     #if defined(DEBUG) && (DEBUG > 0)
       {
          name    : "dump-tags",
          has_arg : 0,
          flag    : NULL,
          val     : 't',
       },
+     #endif
    };
 
    /* preprocessor */
    add_syntax_check("#if", NULL, SYNTAX_TYPE_SINGLE_ENDED, "<font color=purple>","</font>");
    add_syntax_check("#elif", NULL, SYNTAX_TYPE_SINGLE_ENDED, "<font color=purple>","</font>");
    add_syntax_check("#else", NULL, SYNTAX_TYPE_SINGLE_ENDED, "<font color=purple>","</font>");
+   add_syntax_check("#endif", NULL, SYNTAX_TYPE_SINGLE_ENDED, "<font color=purple>","</font>");
    add_syntax_check("#include", NULL, SYNTAX_TYPE_SINGLE_ENDED, "<font color=purple>","</font>");
    add_syntax_check("#define", NULL, SYNTAX_TYPE_SINGLE_ENDED, "<font color=purple>","</font>");
 
@@ -175,6 +194,7 @@ int main(int argc, char** argv)
    /* comments */
    add_syntax_check("/*", "*/", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=#0000ff>","</font>");
    add_syntax_check("//", "\n", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=#0000ff>","</font>");
+   //add_syntax_check("#if 0", "#endif", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=#0000ff>","</font>");
 
    /* strings */
    add_syntax_check("\"", "\"", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=red>","</font>");
@@ -185,7 +205,7 @@ int main(int argc, char** argv)
    add_syntax_check("NULL", NULL, SYNTAX_TYPE_SINGLE_ENDED, "<font color=red>","</font>");
 
 
-   while ((opt = getopt_long(argc, argv, "stf:h", long_opts, &long_index)) != -1)
+   while ((opt = getopt_long(argc, argv, "stf:ho:", long_opts, &long_index)) != -1)
    {
       switch (opt)
       {
@@ -193,15 +213,27 @@ int main(int argc, char** argv)
             usage();
             exit(0);
             break;
+        #if defined(DEBUG) && (DEBUG > 0)
          case 's':
             dump_syntax();
             exit(0);
             break;
+        #endif
+        #if defined(DEBUG) && (DEBUG > 0)
          case 't':
             code_tag_debug = 1;
             break;
+        #endif
          case 'f':
             file = strdup(optarg);
+            break;
+         case 'o':
+            outfile = fopen(optarg, "w");
+            if (outfile == NULL)
+            {
+               printf("error: could not open %s\n",optarg);
+               exit(-1);
+            }
             break;
          case ':':
          case '?':
@@ -218,6 +250,11 @@ int main(int argc, char** argv)
       exit(-1);
    }
 
+   if (outfile == NULL)
+   {
+      outfile = stdout;
+   }
+
    {
       int fd;
       fd = open_file(file);
@@ -225,18 +262,19 @@ int main(int argc, char** argv)
       /* parse file */
       parse_source_code(fd,file);
 
+     #if defined(DEBUG) && (DEBUG > 0)
       if (code_tag_debug)
       {
          dump_code_tags();
       }
       else
+     #endif
       {
          /* print source code */
-         printf("<html>\n");
-         print_source_code(fd,file);
-         printf("</html>\n");
+         print_source_code(fd,outfile,file);
       }
       close(fd);
+      fclose(outfile);
    }
 
    return 0;
@@ -247,8 +285,13 @@ static void usage(void)
    printf("Usage:\n");
    printf("  -h  --help ............................ print help\n");
    printf("  -f [file] --file [file] ............... specify file to parse\n");
+   printf("  -o [file] --output [file] ............. specify output file\n");
+  #if defined(DEBUG) && (DEBUG > 0)
+   printf("\n");
+   printf("Debug:\n");
    printf("  -s --dump-syntax ...................... dump syntax\n");
    printf("  -t --dump-tags ........................ dump tags\n");
+  #endif
 }
 
 static int open_file(const char* file)
@@ -292,8 +335,7 @@ static void parse_source_code(int fd, const char* file)
    }
 }
 
-
-static void print_source_code(int fd, const char* file)
+static void print_source_code(int fd, FILE* outfile, const char* file)
 {
    int buff_len = 1;
    char buffer[] = " ";
@@ -302,8 +344,9 @@ static void print_source_code(int fd, const char* file)
    int line_offset = 0;
    int new_line = 1;
 
-   printf("<a name=\"%s\"></a><h3>%s</h3>\n",file,file);
-   printf("<pre>\n");
+   fprintf(outfile, "<html>\n");
+   fprintf(outfile, "<a name=\"%s\"></a><h3>%s</h3>\n",file,file);
+   fprintf(outfile, "<pre>\n");
 
    lseek(fd, 0, SEEK_SET);
 
@@ -312,30 +355,30 @@ static void print_source_code(int fd, const char* file)
       line_offset++;
       if (new_line)
       {
-         printf("<a name=\"%s%d\"></a><font color=#000000>%06d</font> ",file,line,line);
-         fflush(stdout);
+         if (active_rule()) { fprintf(outfile, "</font>"); fflush(outfile); }
+         fprintf(outfile, "<a name=\"%s%d\"></a><font color=#000000>%06d</font> ",file,line,line);
+         fflush(outfile);
          new_line = 0;
       }
 
       if (find_tag(line, line_offset))
       {
-         printf("%s",find_tag(line, line_offset));
-         fflush(stdout);
+         fprintf(outfile, "%s",find_tag(line, line_offset));
+         fflush(outfile);
       }
 
       if (buffer[0] == '\n')
       {
-         if (active_rule()) { printf("</font>"); fflush(stdout); }
          new_line = 1;
          line++;
          line_offset = 0;
       }
 
-      write(1, &buffer, buff_len);
-      fflush(stdout);
+      fprintf(outfile, "%s", buffer);
    }
 
-   printf("</pre>\n");
+   fprintf(outfile, "</pre>\n");
+   fprintf(outfile, "</html>\n");
 }
 
 static void add_tag(int line, int offset, const char* string)
@@ -518,12 +561,13 @@ static void evaluate_syntax_checks(char* buffer, int buff_len, int line, int lin
 }
 
 
+#if defined(DEBUG) && (DEBUG > 0)
 void dump_syntax(void)
 {
    struct syntax_check *pSyntax;
 
-   printf("%20s   %20s\n","Syntax Check #1","Syntax Check #2");
-   printf("-------------------------------------------\n");
+   printf("%20s   %20s   %20s   %20s\n","Syntax Check #1","Syntax Check #2","Opening Tag","Closing Tag");
+   printf("-----------------------------------------------------------------------------------------\n");
    for (pSyntax = syntax_list_head; pSyntax != NULL; pSyntax = pSyntax->next)
    {
       printf("%20s   %20s   %20s   %20s\n",pSyntax->syntax_check1,(pSyntax->syntax_check2 == NULL ? "NULL" :
@@ -531,7 +575,9 @@ void dump_syntax(void)
                              pSyntax->open_string_if_found, pSyntax->close_string_if_found);
    }
 }
+#endif
 
+#if defined(DEBUG) && (DEBUG > 0)
 static void dump_code_tags(void)
 {
    struct code_tag *pTag;
@@ -544,3 +590,4 @@ static void dump_code_tags(void)
       printf("%06d %06d : %s\n",pTag->line,pTag->offset,pTag->string);
    }
 }
+#endif
