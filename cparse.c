@@ -28,7 +28,7 @@
 
 static void usage(void);
 static int open_file(const char* file);
-static void parse_source_code(int fd, const char* file);
+static void parse_source_code(int fd);
 static void print_source_code(int fd, FILE* outfile, const char* file);
 
 /****************************************************************/
@@ -66,7 +66,7 @@ static struct code_tag *code_tag = NULL;
 enum syntax_type
 {
   SYNTAX_TYPE_SINGLE_ENDED,
-  SYNTAX_TYPE_DOUBLE_ENDED,
+  SYNTAX_TYPE_DOUBLE_ENDED
 };
 
 static void add_syntax_check(const char* syntax_check1,
@@ -119,37 +119,37 @@ int main(int argc, char** argv)
    struct option long_opts[] =
    {
       {
-         name    : "help",
-         has_arg : 0,
-         flag    : NULL,
-         val     : 'h',
+         .name    = "help",
+         .has_arg = 0,
+         .flag    = NULL,
+         .val     = 'h',
       },
       {
-         name    : "file",
-         has_arg : 1,
-         flag    : NULL,
-         val     : 'f',
+         .name    = "file",
+         .has_arg = 1,
+         .flag    = NULL,
+         .val     = 'f',
       },
       {
-         name    : "output",
-         has_arg : 1,
-         flag    : NULL,
-         val     : 'o',
+         .name    = "output",
+         .has_arg = 1,
+         .flag    = NULL,
+         .val     = 'o',
       },
      #if defined(DEBUG) && (DEBUG > 0)
       {
-         name    : "dump-syntax",
-         has_arg : 0,
-         flag    : NULL,
-         val     : 's',
+         .name    = "dump-syntax",
+         .has_arg = 0,
+         .flag    = NULL,
+         .val     = 's',
       },
      #endif
      #if defined(DEBUG) && (DEBUG > 0)
       {
-         name    : "dump-tags",
-         has_arg : 0,
-         flag    : NULL,
-         val     : 't',
+         .name    = "dump-tags",
+         .has_arg = 0,
+         .flag    = NULL,
+         .val     = 't',
       },
      #endif
    };
@@ -260,7 +260,7 @@ int main(int argc, char** argv)
       fd = open_file(file);
 
       /* parse file */
-      parse_source_code(fd,file);
+      parse_source_code(fd);
 
      #if defined(DEBUG) && (DEBUG > 0)
       if (code_tag_debug)
@@ -309,17 +309,16 @@ static int open_file(const char* file)
    return fd;
 }
 
-static void parse_source_code(int fd, const char* file)
+static void parse_source_code(int fd)
 {
    int buff_len = 1;
    char buffer[] = " ";
-   int nc = 0;
    int line = 0;
    int line_offset = 0;
 
    lseek(fd, 0, SEEK_SET);
 
-   while ((nc = read(fd, &buffer, buff_len)) > 0)
+   while ((read(fd, &buffer, buff_len)) > 0)
    {
       evaluate_syntax_checks(buffer, buff_len, line, line_offset);
 
@@ -339,7 +338,6 @@ static void print_source_code(int fd, FILE* outfile, const char* file)
 {
    int buff_len = 1;
    char buffer[] = " ";
-   int nc = 0;
    int line = 0;
    int line_offset = 0;
    int new_line = 1;
@@ -350,7 +348,7 @@ static void print_source_code(int fd, FILE* outfile, const char* file)
 
    lseek(fd, 0, SEEK_SET);
 
-   while ((nc = read(fd, &buffer, buff_len)) > 0)
+   while ((read(fd, &buffer, buff_len)) > 0)
    {
       line_offset++;
       if (new_line)
@@ -485,7 +483,7 @@ static void evaluate_syntax_checks(char* buffer, int buff_len, int line, int lin
 {
    int i;
    struct syntax_check *pSyntax;
-   static char previous_char = ' ';
+   //static char previous_char = ' ';
 
    for (i = 0; i < buff_len; i++)
    {
@@ -556,7 +554,7 @@ static void evaluate_syntax_checks(char* buffer, int buff_len, int line, int lin
 
          //if (pSyntax->next == NULL) break;//return;
       }
-      previous_char = buffer[i];
+      //previous_char = buffer[i];
    }
 }
 
