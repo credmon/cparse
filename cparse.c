@@ -194,7 +194,9 @@ int main(int argc, char** argv)
    /* comments */
    add_syntax_check("/*", "*/", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=#0000ff>","</font>");
    add_syntax_check("//", "\n", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=#0000ff>","</font>");
-   //add_syntax_check("#if 0", "#endif", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=#0000ff>","</font>");
+  #if 0
+   add_syntax_check("#if 0", "#endif", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=#0000ff>","</font>");
+  #endif
 
    /* strings */
    add_syntax_check("\"", "\"", SYNTAX_TYPE_DOUBLE_ENDED, "<font color=red>","</font>");
@@ -392,6 +394,7 @@ static void add_tag(int line, int offset, const char* string)
       code_tag = code_tag->next;
    }
 
+   memset(code_tag, (int) sizeof(struct code_tag), 0);
    code_tag->line   = line;
    code_tag->offset = offset;
    code_tag->string = strdup(string);
@@ -442,6 +445,7 @@ static void add_syntax_check(const char* syntax_check1,
       syntax_list = syntax_list->next;
    }
 
+   memset(syntax_list, (int) sizeof(struct syntax_check), 0);
    syntax_list->syntax_check1 = strdup(syntax_check1);
    syntax_list->syntax_check1_len = strlen(syntax_check1);
 
