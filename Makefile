@@ -6,6 +6,8 @@ STRIP_FLAGS=
 
 all: cparse
 
+debug: cparse-debug
+
 cparse: cparse.c
 	$(CC) $(CFLAGS) -o cparse cparse.c
 	$(STRIP) $(STRIP_FLAGS) cparse
